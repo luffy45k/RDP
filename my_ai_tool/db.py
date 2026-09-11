@@ -53,6 +53,18 @@ CREATE TABLE IF NOT EXISTS meta(
     key   TEXT PRIMARY KEY,
     value TEXT
 );
+CREATE TABLE IF NOT EXISTS vault_files(
+    name       TEXT PRIMARY KEY,
+    purpose    TEXT,
+    updated_at TEXT DEFAULT (datetime('now','localtime'))
+);
+CREATE TABLE IF NOT EXISTS vault_log(
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    task_id    INTEGER,
+    action     TEXT,
+    detail     TEXT,
+    created_at TEXT DEFAULT (datetime('now','localtime'))
+);
 """
 
 
@@ -209,3 +221,31 @@ def meta_set(key: str, value: str) -> None:
         c.execute(
             "INSERT INTO meta(key, value) VALUES(?,?)"
             " ON CONFLICT(key) DO UPDATE SET value=excluded.value", (key, value))
+
+
+# --------------------------------------------------------------- vault index
+
+def vault_set_purpose(name: str, purpose: str) -> None:
+    with connect() as c:
+        c.execute(
+            "INSERT INTO vault_files(name, purpose) VALUES(?,?)"
+            " ON CONFLICT(name) DO UPDATE SET purpose=excluded.purpose,"
+            " updated_at=datetime('now','localtime')", (name, purpose))
+
+
+def vault_get_purposes() -> dict:
+    with connect() as c:
+        return {r["name"]: r["purpose"] for r in
+                c.execute("SELECT name, purpose FROM vault_files")}
+
+
+def vault_log(task_id: int, action: str, detail: str) -> None:
+    with connect() as c:
+        c.execute("INSERT INTO vault_log(task_id, action, detail)"
+                  " VALUES(?,?,?)", (task_id, action, detail[:4000]))
+
+
+def vault_log_recent(limit: int = 20):
+    with connect() as c:
+        return c.execute("SELECT * FROM vault_log ORDER BY id DESC LIMIT ?",
+                         (limit,)).fetchall()

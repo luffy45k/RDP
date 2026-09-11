@@ -39,6 +39,17 @@ DEFAULTS: dict = {
         "auto": True,                           # heal automatically after a crash
         "max_attempts_per_file": 3,
     },
+    "vault": {
+        "path": "",                             # archive location (default ~/.my_ai_tool/vault.zip)
+        "scratch": "auto",                      # auto=/dev/shm (RAM) -> /tmp | ya custom dir
+        "format": "zip",                        # zip | tar.gz (vault-init ke liye)
+        "max_file_mb": 256,                     # zip-bomb guard per file
+        "max_total_mb": 1024,                   # total extraction budget
+        "keep_backups": 3,                      # pre-repack archive backups
+        "auto_add_new_files": True,             # AI ne banayi files repack ho jayein
+        "max_steps": 6,
+        "timeout_sec": 120,
+    },
     "schedule": {
         "interval_min": 15,                     # cron / daemon wake-up interval
     },

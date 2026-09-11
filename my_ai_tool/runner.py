@@ -179,7 +179,14 @@ def run_queued(quiet: bool = False) -> int:
             continue
         db.set_task(row["id"], "running")
         try:
-            execute_plan(row["id"], row["prompt"], yes=True, quiet=quiet)
+            prompt = row["prompt"] or ""
+            if prompt.startswith("vault: "):
+                from . import vault_router
+                vault_router.execute_vault_task(row["id"],
+                                                prompt[len("vault: "):],
+                                                yes=True, quiet=quiet)
+            else:
+                execute_plan(row["id"], prompt, yes=True, quiet=quiet)
         except Exception as e:  # one bad task must not kill the batch
             log.exception("queued task %s crashed", row["id"])
             db.set_task(row["id"], "failed", f"runner error: {e}")

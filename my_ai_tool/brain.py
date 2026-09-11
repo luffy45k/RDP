@@ -183,6 +183,25 @@ def _mock(messages: list) -> dict:
                     "file_to_fix": path, "full_corrected_code": fixed}
         raise BrainError("mock: only ZeroDivisionError demo bugs can be healed")
 
+    if "vault router" in system:
+        if "VAULT_TASK_INCOMPLETE" in text:
+            return {"done": True, "summary": "mock vault: task finished"}
+        names = re.findall(r"^- (.+?) \(", text, re.M)
+        needed = [n for n in ("scripts/report.py", "data/users.csv")
+                  if n in names]
+        if not needed:
+            needed = names[:2]
+        cmds = (["python3 scripts/report.py"]
+                if "scripts/report.py" in needed else
+                (["ls -la"] if needed else []))
+        return {"explanation": "vault mock: minimal lazy-load selected",
+                "needed_files": needed, "commands": cmds}
+
+    if "file-indexer" in system:
+        names = re.findall(r"^- (.+?) \(", text, re.M)
+        return {"files": [{"file": n, "purpose": "mock purpose"}
+                          for n in names]}
+
     return {"explanation": "mock provider: acknowledged task",
             "commands": ["echo 'mock executed task'"]}
 

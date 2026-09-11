@@ -22,6 +22,27 @@ def chat_reply(messages: list) -> dict:
     system = messages[0].get("content", "") if messages else ""
     text = "\n".join(str(m.get("content", "")) for m in messages)
 
+    # vault follow-up (incomplete task)
+    if "VAULT_TASK_INCOMPLETE" in text:
+        return {"done": True, "summary": "hermes3(mock): vault task finished"}
+
+    # vault router (planner)
+    if "vault router" in system:
+        names = re.findall(r"^- (.+?) \(", text, re.M)
+        needed = [n for n in ("scripts/report.py", "data/users.csv")
+                  if n in names] or names[:2]
+        cmds = (["python3 scripts/report.py"]
+                if "scripts/report.py" in needed else
+                (["ls -la"] if needed else []))
+        return {"explanation": "hermes3(mock): minimal lazy-load selected",
+                "needed_files": needed, "commands": cmds}
+
+    # vault indexer
+    if "file-indexer" in system:
+        names = re.findall(r"^- (.+?) \(", text, re.M)
+        return {"files": [{"file": n, "purpose": "hermes3(mock) purpose"}
+                          for n in names]}
+
     # healer prompt
     if "self-repair agent" in system:
         m = re.search(r"SUSPECT_FILE: (.+)", text)

@@ -114,6 +114,77 @@ def cmd_do_task(a):
     return 0
 
 
+def cmd_vault_run(a):
+    from . import vault_router
+    vault_router.do_vault_task(a.prompt, queue=a.queue, yes=a.yes)
+    return 0
+
+
+def cmd_run(a):
+    import os
+    cfg = config.load_config().get("vault", {})
+    vp = os.path.expanduser(cfg.get("path") or "")
+    if vp and os.path.exists(vp):
+        from . import vault_router
+        vault_router.do_vault_task(a.prompt, queue=a.queue, yes=a.yes)
+    else:
+        from . import runner
+        runner.do_task(a.prompt, queue=a.queue, yes=a.yes)
+    return 0
+
+
+def cmd_vault_init(a):
+    from . import vault
+    p = vault.init_from_dir(a.dir)
+    print(f"\U0001f4da vault archive ready: {p}")
+    print("   ab: mytool vault-ls   |   mytool vault-index --ai   |"
+          "   mytool vault-run 'task'")
+    return 0
+
+
+def cmd_vault_ls(a):
+    from . import vault
+    vlt = vault.open_vault()
+    purposes = db.vault_get_purposes()
+    total = 0
+    for name, size in vlt.index():
+        total += size
+        print(f"{size:>12,}  {name}"
+              + (f"   # {purposes[name]}" if name in purposes else ""))
+    print(f"\n{len(vlt.index())} file(s), {total:,} bytes uncompressed"
+          f" — archive compressed at: {vlt.path}")
+    return 0
+
+
+def cmd_vault_index(a):
+    from . import vault_router
+    if not a.ai:
+        from . import vault
+        vlt = vault.open_vault()
+        purposes = db.vault_get_purposes()
+        for name, size in vlt.index():
+            if name in purposes:
+                print(f"  {name:40s} {purposes[name]}")
+        print("(refresh ke liye: mytool vault-index --ai)")
+        return 0
+    n = vault_router.refresh_ai_index()
+    print(f"AI purposes cached for {n} file(s)")
+    return 0
+
+
+def cmd_vault_log(a):
+    for r in db.vault_log_recent(a.limit):
+        print(f"#{r['id']:<4} task={r['task_id']} [{r['action']:^8}]"
+              f" {r['created_at']}  {(r['detail'] or '')[:90]}")
+    return 0
+
+
+def cmd_vault_clean(a):
+    from . import vault
+    print(f"{vault.clean_stale_scratch()} stale scratch dir(s) removed")
+    return 0
+
+
 def cmd_queue(a):
     from . import runner
     runner.do_task(a.prompt, queue=True)

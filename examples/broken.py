@@ -19,7 +19,7 @@ if __name__ == "__main__":
 
     if "--heal-verify" in sys.argv:
         # self-check used by the healer's verification step
-        assert abs(divide(6, 3) - 2.0) < 1e-9
+        assert abs(divide(6, 3) - 1 / 3) < 1e-9
         assert divide(5, 0) == float("inf")
         print("heal-verify OK")
     else:

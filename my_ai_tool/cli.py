@@ -17,6 +17,7 @@ def build_parser() -> argparse.ArgumentParser:
         epilog="""examples:
   mytool do-task "organize ~/Downloads by file type"
   mytool do-task "check disk usage and write a report" --queue
+  mytool setup-ollama              # Ollama + Hermes AI brain ek command mein
   mytool status
   mytool heal                      # fix all open crashes now
   mytool update                    # git-pull latest code + restart
@@ -90,6 +91,15 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--reset", action="store_true",
                    help="restore the buggy demo file (after a self-heal commit)")
     s.set_defaults(func=cmd_crash_test)
+
+    s = sub.add_parser("setup-ollama",
+                       help="Ollama + Hermes (Nous Research) brain ek command mein connect karo")
+    s.add_argument("--model", help="explicit model tag, e.g. hermes3:3b | hermes3:8b")
+    s.add_argument("--size", choices=["3b", "8b", "70b", "auto"], default="auto",
+                   help="RAM ke hisaab se Hermes size (default: auto)")
+    s.add_argument("--skip-install", action="store_true",
+                   help="ollama installer skip karo (server alag machine par hai)")
+    s.set_defaults(func=cmd_setup_ollama)
 
     s = sub.add_parser("init", help="create data dir, config and database")
     s.set_defaults(func=cmd_init)
@@ -314,6 +324,12 @@ def cmd_crash_test(a):
         print("5 / 0 =", mod.divide(5, 0))  # ZeroDivisionError on purpose
         return 0
     raise RuntimeError("Intentional crash-test (no --demo)")
+
+
+def cmd_setup_ollama(a):
+    from . import ollama_setup
+    return ollama_setup.run_setup(model=a.model, size=a.size,
+                                  skip_install=a.skip_install)
 
 
 def cmd_init(a):

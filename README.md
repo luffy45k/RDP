@@ -164,6 +164,30 @@ mytool config set update.auto false        # auto-update band
 mytool config set schedule.interval_min 15
 ```
 
+## Ollama + Hermes AI connect (1 command)
+
+Nous Research ka **Hermes** model Ollama se connect karna ho toh bas:
+
+```bash
+mytool setup-ollama                 # RAM dekhkar hermes3:3b/8b/70b khud choose karta hai
+mytool setup-ollama --size 8b       # explicitly bada model
+mytool setup-ollama --model hermes3:3b
+```
+
+Ye command khud: (1) Ollama server check/start karta hai (binary na mile to
+official installer chalata hai), (2) `ollama pull hermes3:<size>` karta hai,
+(3) `provider=ollama` + model config save karta hai, (4) live test-generation
+se verify karta hai.
+
+| Server RAM | Recommended Hermes | Download |
+|---|---|---|
+| < 7 GB | `hermes3:3b` | ~2 GB |
+| 7–40 GB | `hermes3:8b` | ~4.7 GB |
+| 40 GB+ | `hermes3:70b` | ~40 GB |
+
+Baaki Ollama models (`llama3.2`, `qwen3`, `openhermes`, `nous-hermes2`, ...) bhi
+chalenge — bas `mytool config set ollama.model <model>` kar do.
+
 ## Windows note
 
 Code cross-platform hai (data `%APPDATA%/my_ai_tool/` mein jayega). Auto-run

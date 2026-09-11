@@ -188,6 +188,53 @@ se verify karta hai.
 Baaki Ollama models (`llama3.2`, `qwen3`, `openhermes`, `nous-hermes2`, ...) bhi
 chalenge — bas `mytool config set ollama.model <model>` kar do.
 
+---
+
+## Vault — AI-Driven Lazy-Loading Archive ("Library System")
+
+10GB data bhi **hamesha compressed** rahega. AI index padhkar sirf zaroori
+files `/dev/shm` (RAM) mein extract karta hai, task chalata hai, aur jo files
+badlin sirf wahi **atomically repack** hokar archive mein wapas jaati hain.
+
+```
+mytool vault-run "analyze the user data"
+        │
+        ▼
+┌──────────────┐  1. INDEX   ┌──────────────────────────────────────┐
+│  ROUTER      │────────────▶│ vault.zip (compressed, untouched)    │
+│  (LLM)       │  2. ROUTE   │  scripts/report.py      ← extract ──┐│
+│              │◀────────────│  data/users.csv         ← extract ──┤│
+└──────────────┘  files?     │  assets/... README ...  (compressed)││
+                             └──────────────────────────────────────┘│
+        3. LAZY LOAD          ▼ (sirf 2 files, RAM mein)             │
+                    /dev/shm/mytool-vault-xxxx/  (0700)              │
+        4. EXECUTE           $ python3 scripts/report.py             │
+        5. DIFF              sha256 before/after → kya badla?        │
+        6. REPACK   ◀──────── sirf changed files wapas (atomic+backup)
+        7. CLEANUP           rmtree scratch — turant, hamesha ───────┘
+```
+
+```bash
+mytool vault-init ~/myproject        # folder -> vault.zip (compressed)
+mytool vault-ls                      # index (+ cached AI purposes)
+mytool vault-index --ai              # AI har file ka purpose likh deta hai
+mytool vault-run "generate the report" -y      # full lazy-load transaction
+mytool run "task"                    # smart alias: vault ho toh vault-run
+mytool vault-log                     # extract/diff/repack/cleanup audit trail
+mytool vault-run "task" --queue      # daemon/cron background mein chalega
+mytool vault-clean                   # purane scratch dirs saaf
+```
+
+**Guards:** path-traversal block (`../`), zip-bomb caps (`vault.max_file_mb`/
+`max_total_mb`), archive lock (CLI vs daemon race), har repack se pehle
+timestamped backup (`~/.my_ai_tool/backups/vault/`), sirf `.zip`/`.tar.gz`
+members (tar symlinks/devices skip). Scratch RAM mein (`/dev/shm` tmpfs)
+jab available, warna `/tmp` — dono par mode `0700`.
+
+Config keys: `vault.path`, `vault.scratch` (auto|shm|tmp|custom),
+`vault.format` (zip|tar.gz), `vault.auto_add_new_files`, `vault.max_steps`,
+`vault.timeout_sec`, `vault.keep_backups`.
+
 ## Windows note
 
 Code cross-platform hai (data `%APPDATA%/my_ai_tool/` mein jayega). Auto-run

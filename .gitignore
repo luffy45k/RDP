@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# local runtime artifacts (never commit data — data lives in ~/.my_ai_tool)
+*.log
+*.db
+*.db-wal
+*.db-shm
+crash-*.md
+heal-report-*.md

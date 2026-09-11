@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# mytool launcher — resolves the code dir from this file's real location,
+# prefers the persistent venv, and never stores any data in the code dir.
+set -euo pipefail
+
+SELF="$(readlink -f "${BASH_SOURCE[0]}")"
+CODE_DIR="$(dirname "$(dirname "$SELF")")"
+
+PY="$HOME/.my_ai_tool/venv/bin/python"
+[ -x "$PY" ] || PY="$(command -v python3 || true)"
+if [ -z "${PY:-}" ]; then
+    echo "mytool: python3 not found" >&2
+    exit 1
+fi
+
+export MYTOOL_CODE_DIR="$CODE_DIR"
+export PYTHONPATH="$CODE_DIR${PYTHONPATH:+:$PYTHONPATH}"
+exec "$PY" -m my_ai_tool "$@"

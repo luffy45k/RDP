@@ -62,12 +62,16 @@ def validate_member(name: str) -> str:
     """Normalise and reject dangerous member names (traversal etc.)."""
     if not name or "\x00" in name:
         raise VaultError(f"invalid member name: {name!r}")
-    n = name.replace("\\", "/").lstrip("./")
+    n = name.replace("\\", "/")
+    while n.startswith("./"):     # strip plain './' prefixes only
+        n = n[2:]
     if n.startswith("/") or pathlib.PurePosixPath(n).is_absolute():
         raise VaultError(f"absolute member path not allowed: {name!r}")
     parts = [p for p in n.split("/") if p not in ("", ".")]
     if any(p == ".." for p in parts):
         raise VaultError(f"path traversal not allowed: {name!r}")
+    if not parts:
+        raise VaultError(f"empty member name: {name!r}")
     if len(parts) > 32:
         raise VaultError(f"member path too deep: {name!r}")
     return "/".join(parts)

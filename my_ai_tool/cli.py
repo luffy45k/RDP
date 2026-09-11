@@ -87,6 +87,8 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("crash-test", help=argparse.SUPPRESS)
     s.add_argument("--demo", action="store_true",
                    help="crash on examples/broken.py (ZeroDivisionError)")
+    s.add_argument("--reset", action="store_true",
+                   help="restore the buggy demo file (after a self-heal commit)")
     s.set_defaults(func=cmd_crash_test)
 
     s = sub.add_parser("init", help="create data dir, config and database")

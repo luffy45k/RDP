@@ -102,8 +102,10 @@ Update ka source `config` mein hai: `update.repo_url` (default: is GitHub repo
 mytool config set provider mock     # bina Ollama ke bhi pipeline chalega
 mytool crash-test --demo            # ZeroDivisionError -> crash -> auto-fix
 mytool crashes                      # crash #1 [fixed] dekho
-git checkout examples/broken.py     # bug wapas lao, dobara demo karo
+mytool crash-test --reset           # bug wapas lao, dobara demo karo
 ```
+
+> Fix ke baad healer `self-heal(crash-N)` commit bana deta hai — `git log` mein dekho.
 
 Real Ollama ke saath: `mytool config set provider ollama` — koi bhi Python
 bug traceback ke saath fix hoga.

@@ -202,7 +202,12 @@ def _git_autocommit(rel: str, crash_id: int, analysis: str) -> None:
 
 
 def heal_crash(crash) -> str:
-    """Returns 'fixed' | 'reported' | 'failed' | 'skipped'."""
+    """Returns 'fixed' | 'reported' | 'failed' | 'skipped'.
+
+    Every attempt is counted (even LLM-unreachable ones) so a permanently
+    broken crash cannot loop forever: after max_attempts it is parked as
+    'failed' and the human can look at `mytool crashes ID`.
+    """
     crash_id = crash["id"]
     max_attempts = int(config.load_config().get("heal", {})
                        .get("max_attempts_per_file", 3))
@@ -211,6 +216,22 @@ def heal_crash(crash) -> str:
         log.warning("crash #%s exceeded max attempts — marked failed", crash_id)
         return "skipped"
 
+    attempts = crash["attempts"] + 1
+    db.update_crash(crash_id, attempts=attempts)
+
+    try:
+        return _heal_crash_inner(crash, attempts, max_attempts)
+    except (brain.BrainError, HealError) as e:
+        if attempts >= max_attempts:
+            db.update_crash(crash_id, status="failed")
+        log.warning("crash #%s heal attempt %s/%s failed: %s",
+                    crash_id, attempts, max_attempts, e)
+        print(f"\u26a0\ufe0f crash #{crash_id} attempt {attempts}/{max_attempts}: {e}")
+        return "failed"
+
+
+def _heal_crash_inner(crash, attempts: int, max_attempts: int) -> str:
+    crash_id = crash["id"]
     mode = config.load_config().get("heal", {}).get("mode", "apply")
     prompt = _build_prompt(crash)
     resp = brain.chat([{"role": "system", "content": brain.HEALER_SYSTEM},
@@ -245,11 +266,10 @@ def heal_crash(crash) -> str:
 
     # VERIFY FAILED -> instant rollback
     shutil.copy2(backup, target)
-    attempts = crash["attempts"] + 1
     status = "failed" if attempts >= max_attempts else "open"
-    db.update_crash(crash_id, status=status, attempts=attempts)
+    db.update_crash(crash_id, status=status)
     log.error("crash #%s: verification failed, rolled back (%s). attempts=%s",
-              crash_id, detail.splitlines()[0], attempts)
+              crash_id, detail.splitlines()[0] if detail else "?", attempts)
     print(f"\u26a0\ufe0f verification failed for {rel} — rolled back from backup."
           f" ({attempts}/{max_attempts} attempts used)")
     return "failed"

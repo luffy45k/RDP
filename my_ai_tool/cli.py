@@ -266,7 +266,42 @@ def cmd_version(a):
     return 0
 
 
+# original buggy content of examples/broken.py — used by `crash-test --reset`
+BUGGY_DEMO = '''"""Demo module for testing the self-healing system.
+
+This file ships INTENTIONALLY buggy: divide(x, 0) raises ZeroDivisionError.
+
+Try the full self-heal demo:
+    mytool crash-test --reset       # bug wapas lao (heal ke baad)
+    mytool crash-test --demo        # tool crashes, crash gets logged, AI fixes it
+    mytool crashes                  # see the recorded crash
+"""
+from __future__ import annotations
+
+
+def divide(a: float, b: float) -> float:
+    return 1 / b
+
+
+if __name__ == "__main__":
+    import sys
+
+    if "--heal-verify" in sys.argv:
+        # self-check used by the healer's verification step
+        assert abs(divide(6, 3) - 1 / 3) < 1e-9
+        assert divide(5, 0) == float("inf")
+        print("heal-verify OK")
+    else:
+        print("divide(6, 3) =", divide(6, 3))
+'''
+
+
 def cmd_crash_test(a):
+    if a.reset:
+        p = paths.code_dir() / "examples" / "broken.py"
+        p.write_text(BUGGY_DEMO, encoding="utf-8")
+        print(f"demo bug restored in {p}")
+        return 0
     if a.demo:
         import importlib.util
         p = paths.code_dir() / "examples" / "broken.py"

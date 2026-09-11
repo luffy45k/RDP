@@ -54,11 +54,22 @@ def run(core: bool = False) -> tuple:
         ok, detail = b.ping()
         return ok, detail
 
+    def _vault():
+        from . import vault as v
+        for bad in ("../evil.txt", "/abs", "a/../../b", ""):
+            try:
+                v.validate_member(bad)
+                return False, f"traversal guard failed on {bad!r}"
+            except v.VaultError:
+                continue
+        return True, "path-traversal guards OK"
+
     check("data-dir-writable", _paths)
     check("database", _db)
     check("config", _config)
     check("module-imports", _imports)
     check("git-version", _git)
+    check("vault-guards", _vault)
     if not core:
         check("llm-reachable", _brain, critical=False)
 

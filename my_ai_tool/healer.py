@@ -140,9 +140,9 @@ def _build_prompt(crash) -> str:
 def _resolve_target(raw: str):
     """Path-safety: the fix may only touch existing .py files inside the repo."""
     code_dir = paths.code_dir()
-    p = Path_abs(raw, code_dir)
+    p = pathlib.Path(raw if os.path.isabs(raw) else str(code_dir / raw)).resolve()
     try:
-        p.relative_to(code_dir)
+        p.relative_to(code_dir.resolve())
     except ValueError:
         raise HealError(f"refusing to touch file outside code dir: {raw}")
     if p.suffix != ".py":

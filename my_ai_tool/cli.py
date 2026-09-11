@@ -36,6 +36,42 @@ def build_parser() -> argparse.ArgumentParser:
                    help="run commands without confirmation prompt")
     s.set_defaults(func=cmd_do_task)
 
+    s = sub.add_parser("vault-run",
+                       help="vault archive se AI lazy-load karke task chalao")
+    s.add_argument("prompt")
+    s.add_argument("--queue", action="store_true")
+    s.add_argument("-y", "--yes", action="store_true")
+    s.set_defaults(func=cmd_vault_run)
+
+    s = sub.add_parser("run",
+                       help="smart alias: vault configured ho toh vault-run, warna do-task")
+    s.add_argument("prompt")
+    s.add_argument("--queue", action="store_true")
+    s.add_argument("-y", "--yes", action="store_true")
+    s.set_defaults(func=cmd_run)
+
+    s = sub.add_parser("vault-init",
+                       help="directory ko compressed vault archive banao (zip/tar.gz)")
+    s.add_argument("dir")
+    s.set_defaults(func=cmd_vault_init)
+
+    s = sub.add_parser("vault-ls", help="vault archive ka index dikhao")
+    s.set_defaults(func=cmd_vault_ls)
+
+    s = sub.add_parser("vault-index",
+                       help="AI se har file ka purpose likhwao (cached)")
+    s.add_argument("--ai", action="store_true",
+                   help="LLM se purposes generate karo")
+    s.set_defaults(func=cmd_vault_index)
+
+    s = sub.add_parser("vault-log", help="vault transactions ka log")
+    s.add_argument("--limit", type=int, default=20)
+    s.set_defaults(func=cmd_vault_log)
+
+    s = sub.add_parser("vault-clean",
+                       help="purane scratch dirs (/dev/shm//tmp) saaf karo")
+    s.set_defaults(func=cmd_vault_clean)
+
     s = sub.add_parser("queue", help="alias of: do-task --queue")
     s.add_argument("prompt")
     s.set_defaults(func=cmd_queue)

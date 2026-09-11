@@ -175,7 +175,7 @@ def execute_vault_task(task_id: int, prompt: str, yes: bool,
                 for name, p in after.items():
                     if len(add) >= ADD_FILE_CAP:
                         break
-                    if p.stat().st_size <= vault._limits()[0]:
+                    if os.path.getsize(p) <= vault._limits()[0]:
                         add.append((name, p))   # AI created new files
             db.vault_log(task_id, "diff",
                          f"modified={len(replace)} new={len(add)} "

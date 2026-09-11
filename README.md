@@ -127,12 +127,12 @@ Installer kya karta hai: code git repo mein install → `~/.my_ai_tool/venv`
 (isolated python, **zero pip dependencies** — pure stdlib) → `~/.local/bin/mytool`
 symlink → cron/timer → Ollama check.
 
-Requirements: `python3`, `git`, aur AI ke liye [Ollama](https://ollama.com):
+Requirements: `python3`, `git`, aur AI ke liye [Ollama](https://ollama.com) + **Hermes** model:
 
 ```bash
 curl -fsSL https://ollama.com/install.sh | sh
-ollama pull llama3.2
-mytool config set provider ollama
+ollama pull hermes3:3b        # ya bade server par: hermes3:8b
+mytool setup-ollama           # ya ek command mein sab automatic
 ```
 
 ## Commands

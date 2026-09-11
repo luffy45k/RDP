@@ -14,8 +14,8 @@ DEFAULTS: dict = {
     "provider": "ollama",                       # ollama | openai | mock
     "ollama": {
         "url": "http://localhost:11434",
-        "model": "",                            # empty = auto-detect first installed model
-        "timeout_sec": 180,
+        "model": "hermes3:3b",                  # Nous Research Hermes (default)
+        "timeout_sec": 300,
     },
     "openai": {
         "base_url": "https://api.openai.com/v1",

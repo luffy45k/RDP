@@ -122,11 +122,13 @@ def _ollama_first_model(base_url: str) -> str:
     except (urllib.error.URLError, OSError, json.JSONDecodeError):
         raise BrainError(
             f"Ollama not reachable at {base_url} — is it running? "
-            "Start it with `ollama serve` and pull a model: `ollama pull llama3.2`")
+            "Start it with `ollama serve` and pull the model: `ollama pull hermes3:3b`"
+            " (ya auto-setup: `mytool setup-ollama`)")
     if not models:
         raise BrainError(
-            "Ollama has no models installed. Run: `ollama pull llama3.2`")
-    return models[0].get("name", "llama3.2")
+            "Ollama has no models installed. Run: `ollama pull hermes3:3b`"
+            " (ya auto-setup: `mytool setup-ollama`)")
+    return models[0].get("name", "hermes3:3b")
 
 
 def _openai(messages: list, cfg: dict, json_mode: bool) -> dict:

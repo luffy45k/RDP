@@ -147,9 +147,11 @@ else
 
 brain  : Ollama NOT detected on localhost:11434.
          1) install : curl -fsSL https://ollama.com/install.sh | sh
-         2) model   : ollama pull llama3.2
-         3) test    : mytool status
-         (ya filhaal testing ke liye: mytool config set provider mock)
+         2) model   : ollama pull hermes3:3b      # Nous Research Hermes (chhote server)
+                      # 7GB+ RAM ho toh: ollama pull hermes3:8b
+         3) ya auto : mytool setup-ollama         # sab khud kar deta hai
+         4) test    : mytool status
+         (testing bina server ke: mytool config set provider mock)
 HINT
 fi
 

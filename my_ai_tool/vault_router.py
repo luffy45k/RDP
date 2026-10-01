@@ -16,7 +16,6 @@ Flow (exactly the spec):
 from __future__ import annotations
 
 import os
-import re
 import sys
 
 from . import brain, config, db, vault
@@ -172,11 +171,16 @@ def execute_vault_task(task_id: int, prompt: str, yes: bool,
                 elif vault.sha256_file(p) != h:
                     replace[name] = p   # AI modified it
             if auto_add:
+                in_archive = {n for n, _ in vlt.index()}
                 for name, p in after.items():
                     if len(add) >= ADD_FILE_CAP:
                         break
-                    if os.path.getsize(p) <= vault._limits()[0]:
-                        add.append((name, p))   # AI created new files
+                    if os.path.getsize(p) > vault._limits()[0]:
+                        continue
+                    if name in in_archive:
+                        replace[name] = p       # overwrote a non-extracted member
+                    else:
+                        add.append((name, p))   # AI created a new file
             db.vault_log(task_id, "diff",
                          f"modified={len(replace)} new={len(add)} "
                          f"deleted={len(delete)}")

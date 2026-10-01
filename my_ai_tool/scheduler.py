@@ -10,10 +10,9 @@ new/healed code takes effect immediately.
 from __future__ import annotations
 
 import os
-import sys
 import time
 
-from . import config, db, paths
+from . import config, paths
 from .logging_setup import get_logger
 
 log = get_logger("scheduler")
@@ -31,6 +30,8 @@ class _Lock:
         except (ImportError, AttributeError):
             pass  # platform without fcntl (Windows): run without lock
         except BlockingIOError:
+            self.fh.close()          # another tick holds it — don't leak the fd
+            self.fh = None
             raise Busy()
         return self
 
@@ -99,6 +100,7 @@ def cron_tick(quiet: bool = False) -> int:
 
 
 def daemon(interval_min: int | None = None) -> int:
+    from . import updater  # needed by the restart-after-update path below
     cfg = config.load_config().get("schedule", {})
     interval = int(interval_min or cfg.get("interval_min", 15))
     log.info("daemon started, interval=%s min, pid=%s", interval, os.getpid())

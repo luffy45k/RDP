@@ -3,9 +3,9 @@
 This file ships INTENTIONALLY buggy: divide(x, 0) raises ZeroDivisionError.
 
 Try the full self-heal demo:
+    mytool crash-test --reset       # bug wapas lao (heal ke baad)
     mytool crash-test --demo        # tool crashes, crash gets logged, AI fixes it
     mytool crashes                  # see the recorded crash
-    git checkout examples/broken.py # restore the bug to demo again
 """
 from __future__ import annotations
 

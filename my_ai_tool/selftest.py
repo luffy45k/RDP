@@ -5,8 +5,6 @@ never cause a good code fix to be rolled back.
 """
 from __future__ import annotations
 
-import sys
-
 from . import config, db, paths
 from . import updater
 

@@ -1,0 +1,95 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  tests:
+    name: tests (python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # updater.current_version() needs git history
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Configure git identity (the self-healer commits its fixes)
+        run: |
+          git config --global user.name "mytool-ci"
+          git config --global user.email "ci@example.com"
+
+      - name: Compile every module
+        run: python -m compileall -q my_ai_tool tests dev examples
+
+      - name: Run the test suite
+        run: ./run_tests.sh -v
+
+  demo:
+    name: self-heal demo (end to end)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Configure git identity
+        run: |
+          git config --global user.name "mytool-ci"
+          git config --global user.email "ci@example.com"
+
+      - name: Install (cron-less environment)
+        run: ./install.sh || true
+
+      - name: Crash, self-heal, verify
+        run: |
+          set -euo pipefail
+          export PATH="$HOME/.local/bin:$PATH"
+          mytool config set provider mock
+          mytool status
+          mytool crash-test --demo | tee /tmp/demo.log
+          grep -q "self-heal OK" /tmp/demo.log
+          mytool crashes | grep -q "fixed"
+          git log --oneline -1 | grep -q "self-heal(crash-1)"
+          mytool selftest --core
+          mytool crash-test --reset
+
+      - name: Vault lazy-load transaction
+        run: |
+          set -euo pipefail
+          export PATH="$HOME/.local/bin:$PATH"
+          mkdir -p /tmp/proj/scripts /tmp/proj/data
+          printf 'name,age\nasha,31\nraj,24\n' > /tmp/proj/data/users.csv
+          cat > /tmp/proj/scripts/report.py <<'PY'
+          import csv, pathlib
+          rows = list(csv.DictReader(open("data/users.csv")))
+          pathlib.Path("out").mkdir(exist_ok=True)
+          pathlib.Path("out/report.txt").write_text(f"users={len(rows)}\n")
+          print("users", len(rows))
+          PY
+          mytool vault-init /tmp/proj
+          mytool vault-run "generate the report" -y
+          mytool vault-run "generate the report" -y
+          mytool vault-ls
+          mytool vault-log --limit 5
+          python3 - <<'PY'
+          import zipfile, pathlib
+          p = pathlib.Path.home() / ".my_ai_tool" / "vault.zip"
+          names = zipfile.ZipFile(p).namelist()
+          assert "out/report.txt" in names, names
+          assert len(names) == len(set(names)), f"duplicate members: {names}"
+          print("vault OK:", names)
+          PY

@@ -7,6 +7,6 @@ user-data folder so that code updates / deletes never destroy it.
     Windows   : %APPDATA%/my_ai_tool/
 """
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 APP_NAME = "mytool"
 DATA_DIR_NAME = "my_ai_tool"

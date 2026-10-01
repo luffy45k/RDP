@@ -12,8 +12,9 @@ The full pipeline — "All" flows supported:
                   returns {analysis, file_to_fix, full_corrected_code}.
   5. APPLY        original file is backed up to ~/.my_ai_tool/backups, then
                   the corrected file is written.
-  6. VERIFY       py_compile + module --heal-verify self-check + core
-                  selftest must ALL pass.
+  6. VERIFY       py_compile + an import of the patched module + the file's
+                  optional --heal-verify self-check + the core selftest must
+                  ALL pass.
   7. COMMIT/ROLLBACK  verified -> git autocommit "self-heal(crash-N)" and the
                   daemon restarts itself; any verification failure -> instant
                   rollback from the backup, crash stays open for another try.
@@ -27,7 +28,6 @@ from __future__ import annotations
 import datetime
 import os
 import pathlib
-import py_compile
 import re
 import shutil
 import subprocess
@@ -160,29 +160,83 @@ def _backup(target, rel: str) -> str:
     return str(dst)
 
 
-def _verify(target) -> tuple:
-    """py_compile + optional file --heal-verify selfcheck + core selftest."""
-    py = sys.executable if os.name != "nt" else sys.executable
-    env = dict(os.environ)
-    env["MYTOOL_CODE_DIR"] = str(paths.code_dir())
-    env["PYTHONPATH"] = env["MYTOOL_CODE_DIR"] + os.pathsep + env.get("PYTHONPATH", "")
+def _module_name(target) -> str | None:
+    """Dotted module name, if `target` lives inside an importable package.
 
-    p = subprocess.run([py, "-m", "py_compile", str(target)],
-                       capture_output=True, text=True, timeout=60)
+    Returns None for top-level scripts and for anything outside the code dir,
+    i.e. for files that must be launched as plain scripts.
+    """
+    code_dir = paths.code_dir().resolve()
+    try:
+        rel = pathlib.Path(target).resolve().relative_to(code_dir)
+    except ValueError:
+        return None
+    parts = list(rel.with_suffix("").parts)
+    if len(parts) < 2:
+        return None                      # a loose script, not a package module
+    pkg = code_dir
+    for part in parts[:-1]:
+        pkg = pkg / part
+        if not (pkg / "__init__.py").exists():
+            return None                  # plain folder (examples/, dev/, ...)
+    return ".".join(parts)
+
+
+def _heal_verify_argv(target, py: str) -> list | None:
+    """argv for the file's OPTIONAL `--heal-verify` self-check (None = skip).
+
+    A file opts in by handling "--heal-verify" in its __main__ block. Package
+    modules are launched with `-m pkg.mod` so their relative imports resolve —
+    running them as plain scripts always dies with ImportError, which used to
+    roll back perfectly good fixes to the tool's own code.
+    """
+    try:
+        src = pathlib.Path(target).read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    if "--heal-verify" not in src:
+        return None                      # file provides no self-check
+    mod = _module_name(target)
+    if mod:
+        return [py, "-m", mod, "--heal-verify"]
+    return [py, str(target), "--heal-verify"]
+
+
+def _verify(target) -> tuple:
+    """py_compile -> import -> optional --heal-verify -> core selftest.
+
+    Every stage must pass; the first failure rolls the patch back.
+    """
+    py = sys.executable
+    code_dir = str(paths.code_dir())
+    env = dict(os.environ)
+    env["MYTOOL_CODE_DIR"] = code_dir
+    env["PYTHONPATH"] = code_dir + os.pathsep + env.get("PYTHONPATH", "")
+
+    def _run(argv, timeout):
+        return subprocess.run(argv, capture_output=True, text=True,
+                              timeout=timeout, env=env, cwd=code_dir)
+
+    p = _run([py, "-m", "py_compile", str(target)], 60)
     if p.returncode != 0:
         return False, f"py_compile failed:\n{p.stderr[-1500:]}"
 
-    p = subprocess.run([py, str(target), "--heal-verify"],
-                       capture_output=True, text=True, timeout=120)
-    if p.returncode != 0:
-        unknown_arg = p.returncode == 2 and re.search(
-            r"unrecognized|invalid choice|no such option", p.stderr or "", re.I)
-        if not unknown_arg:
-            return False, f"--heal-verify failed:\n{(p.stderr or p.stdout)[-1500:]}"
+    mod = _module_name(target)
+    if mod:
+        p = _run([py, "-c", f"import {mod}"], 120)
+        if p.returncode != 0:
+            return False, f"import {mod} failed:\n{(p.stderr or p.stdout)[-1500:]}"
 
-    p = subprocess.run([py, "-m", "my_ai_tool", "selftest", "--core"],
-                       capture_output=True, text=True, timeout=180, env=env,
-                       cwd=str(paths.code_dir()))
+    argv = _heal_verify_argv(target, py)
+    if argv:
+        p = _run(argv, 120)
+        if p.returncode != 0:
+            unknown_arg = p.returncode == 2 and re.search(
+                r"unrecognized|invalid choice|no such option", p.stderr or "", re.I)
+            if not unknown_arg:
+                return False, f"--heal-verify failed:\n{(p.stderr or p.stdout)[-1500:]}"
+
+    p = _run([py, "-m", "my_ai_tool", "selftest", "--core"], 180)
     if p.returncode != 0:
         return False, f"core selftest failed:\n{(p.stdout or p.stderr)[-1500:]}"
     return True, "all verifications passed"

@@ -100,6 +100,16 @@ class _CapReader:
                 " — possible zip bomb; aborting")
         return data
 
+    def read_all(self, chunk: int = 1 << 20) -> bytes:
+        """Read the whole member in chunks so the cap trips *while* the
+        (possibly lying) member is still decompressing — never after."""
+        buf = bytearray()
+        while True:
+            block = self.read(chunk)
+            if not block:
+                return bytes(buf)
+            buf += block
+
 
 # ------------------------------------------------------------------- locking
 
@@ -242,9 +252,15 @@ class BaseVault:
         Atomic: writes a full new archive (old members streamed through,
         capped), timestamped backup first, then os.replace().
         """
-        replace = replace or {}
-        add = add or {}
-        delete = set(delete or set())
+        # normalise + de-overlap the buckets: a member may appear in exactly
+        # one of them (delete wins, then replace), otherwise the rewritten
+        # archive would end up with duplicate entries of the same name.
+        delete = {validate_member(n) for n in (delete or set())}
+        replace = {validate_member(k): v for k, v in (replace or {}).items()
+                   if validate_member(k) not in delete}
+        add = {validate_member(k): v for k, v in (add or {}).items()
+               if validate_member(k) not in delete
+               and validate_member(k) not in replace}
         if not (replace or add or delete):
             return {"changed": False}
 
@@ -292,26 +308,34 @@ class ZipVault(BaseVault):
             with zf.open(meta["raw"]) as f:
                 capped = _CapReader(f, min(self.max_file, meta["size"] + 64),
                                     name)
-                data = capped.read()
+                data = capped.read_all()
         if len(data) != meta["size"]:
             raise VaultError(f"{name}: declared {meta['size']}B but read"
                              f" {len(data)}B — archive corrupt?")
         return data
 
     def _write_new(self, tmp, replace, add, delete) -> dict:
+        override = {**replace, **add}
+        skip = set(override) | set(delete)
         copied = 0
+        seen = set()
         with zipfile.ZipFile(self.path) as zin, \
                 zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as zout:
             for zi in zin.infolist():
-                name = validate_member(zi.filename)
-                if zi.filename.endswith("/") or name in delete or name in replace:
+                if zi.filename.endswith("/"):
                     continue
+                name = validate_member(zi.filename)
+                # skip members we are about to rewrite/drop, and any stale
+                # duplicate left behind by an older version of the tool
+                if name in skip or name in seen:
+                    continue
+                seen.add(name)
                 with zin.open(zi) as fsrc, \
                         zout.open(zi, "w") as fdst:
                     shutil.copyfileobj(
                         _CapReader(fsrc, self.max_file, name), fdst, 1 << 20)
                 copied += 1
-            for name, local in {**replace, **add}.items():
+            for name, local in override.items():
                 zout.write(local, arcname=name)
         return {"copied": copied,
                 "replaced": len(replace), "added": len(add),
@@ -345,17 +369,21 @@ class TarVault(BaseVault):
             if f is None:
                 raise VaultError(f"{name} is not a regular file")
             return _CapReader(f, min(self.max_file, meta["size"] + 64),
-                              name).read()
+                              name).read_all()
 
     def _write_new(self, tmp, replace, add, delete) -> dict:
+        override = {**replace, **add}
+        skip = set(override) | set(delete)
         copied = skipped = 0
+        seen = set()
         with tarfile.open(self.path, self._mode()) as tin, \
                 tarfile.open(tmp, self._wmode()) as tout:
             for m in tin:
                 name = validate_member(m.name)
-                if name in delete or name in replace:
+                if name in skip or name in seen:
                     continue
                 if m.isfile():
+                    seen.add(name)
                     f = tin.extractfile(m)
                     tout.addfile(m, _CapReader(f, self.max_file, name))
                     copied += 1
@@ -363,7 +391,7 @@ class TarVault(BaseVault):
                     tout.addfile(m)
                 else:
                     skipped += 1  # symlinks/devices are not carried over
-            for name, local in {**replace, **add}.items():
+            for name, local in override.items():
                 info = tout.gettarinfo(str(local), arcname=name)
                 with open(local, "rb") as f:
                     tout.addfile(info, f)

@@ -1,5 +1,7 @@
 # mytool — Self-Running, Self-Updating, Self-Healing Terminal AI Agent
 
+[![CI](https://github.com/luffy45k/RDP/actions/workflows/ci.yml/badge.svg)](https://github.com/luffy45k/RDP/actions/workflows/ci.yml)
+
 Ek terminal AI tool jo **natural language task** leta hai, LLM (Ollama — local
 aur free) se baat karke shell commands chalata hai, **khud update** hota hai
 (GitHub se), aur **apne bugs khud fix** karta hai (LLM se patch lekar, verify
@@ -87,8 +89,11 @@ Update ka source `config` mein hai: `update.repo_url` (default: is GitHub repo
 4. **DIAGNOSE** — traceback + suspect file ka poora code LLM ko jata hai;
    LLM `{"analysis", "file_to_fix", "full_corrected_code"}` return karta hai.
 5. **APPLY** — original file `~/.my_ai_tool/backups/` mein backup, phir patch write.
-6. **VERIFY** — `py_compile` + file ka `--heal-verify` self-check + core
-   selftest — **teeno pass hone chahiye**.
+6. **VERIFY** — `py_compile` → patched module ka **import** → file ka optional
+   `--heal-verify` self-check → **core selftest** — sab pass hone chahiye.
+   (Package modules `python -m my_ai_tool.<mod>` se chalte hain taaki unke
+   relative imports kaam karein; jo file self-check nahi deti uska step skip
+   ho jata hai.)
 7. **COMMIT / ROLLBACK** — pass → git autocommit `self-heal(crash-N)` + daemon
    restart; **fail → instant rollback** from backup, crash open rehta hai.
 8. **REPORT-ONLY** — `mytool config set heal.mode report` → sirf analysis
@@ -243,6 +248,40 @@ ke liye Task Scheduler:
 ```
 schtasks /create /tn "mytool" /tr "C:\path\to\python -m my_ai_tool cron-tick" /sc minute /mo 15
 ```
+
+## Development & tests
+
+Zero pip dependencies — test suite bhi pure stdlib `unittest` hai.
+
+```bash
+./run_tests.sh                      # poora suite + core selftest
+./run_tests.sh -v                   # test naam ke saath
+./run_tests.sh tests.test_vault     # ek module
+MYTOOL_TEST_VERBOSE=1 ./run_tests.sh  # tool ka apna output bhi dikhao
+python3 -m unittest discover -s tests -t .    # same cheez, bina script ke
+```
+
+126 tests har module ko cover karte hain — safety blocklist, vault ke
+path-traversal/zip-bomb guards aur repack transaction, healer ka poora
+apply→verify→rollback cycle, updater ka git rebase/conflict behaviour,
+daemon restart, aur `crash-test --demo` ka end-to-end flow (asli subprocess +
+asli git repo mein). Har test throw-away data dir par chalta hai, aur jahan
+code patch hota hai wahan repo ki **copy** par — tumhara `~/.my_ai_tool` aur
+checkout kabhi touch nahi hote. CI (GitHub Actions) yehi suite Python
+3.9/3.11/3.12 par chalata hai + ek alag job poora self-heal aur vault demo
+chalakar verify karta hai.
+
+Useful env vars (testing/packaging ke liye):
+
+| Variable | Kaam |
+|---|---|
+| `MYTOOL_DATA_DIR` | home override — data `$MYTOOL_DATA_DIR/.my_ai_tool` mein jayega |
+| `MYTOOL_CODE_DIR` | code (git repo) kahan hai — updater/healer isi folder ko chhuyenge |
+| `MYTOOL_UPDATE_REMOTE` | `origin` ke bajay doosra git remote |
+| `MYTOOL_PYTHON` | restart/`os.execv` ke liye python binary |
+
+Bina Ollama ke AI pipeline test karna ho toh: `mytool config set provider mock`,
+ya asli HTTP path ke liye fake server — `python3 dev/mock_ollama_server.py`.
 
 ## Security notes (padho zaroor)
 
